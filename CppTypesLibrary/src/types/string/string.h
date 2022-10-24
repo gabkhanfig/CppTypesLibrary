@@ -1,12 +1,8 @@
 #pragma once
 
 #include <iomanip>
-#include <iostream>
-
-
 
 constexpr size_t maxSSOLength = 23;
-constexpr size_t STRING_SSO_FLAG_BIT = 1ULL << 63;
 
 /* Constexpr and SSO enabled string. Can store strings of length 23 within sso buffer (excluding null terminator). */
 struct string 
