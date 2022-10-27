@@ -2,12 +2,12 @@
 
 #include <iomanip>
 
-constexpr size_t maxSSOLength = 23;
-
 /* Constexpr and SSO enabled string. Can store strings of length 23 within sso buffer (excluding null terminator). */
-struct string 
+struct string
 {
 public:
+
+	static constexpr size_t maxSSOLength = 23;
 
 	struct LongString {
 		char* data;
@@ -22,8 +22,8 @@ public:
 	struct SmallString {
 		char chars[maxSSOLength + 1];
 
-		constexpr SmallString() 
-			: chars{'\0' }
+		constexpr SmallString()
+			: chars{ '\0' }
 		{}
 
 		constexpr void operator = (const LongString& other) {
@@ -39,6 +39,8 @@ public:
 			lng = LongString();
 		}
 	};
+
+	
 
 private:
 
@@ -202,6 +204,122 @@ public:
 		}
 	}
 
+	constexpr char At(size_t index) {
+		if (index > length + 1) {
+			return '\0';
+		}
+		return CStr()[index];
+	}
+
+	constexpr char operator[] (size_t index) {
+		return At(index);
+	}
+
+	constexpr bool Contains(char character) {
+		const char* cstr = CStr();
+		for (size_t i = 0; i < Length(); i++) {
+			if (cstr[i] == character) return true;
+		}
+		return false;
+	}
+
+	constexpr bool Contains(const char* str) {
+		const size_t len = std::char_traits<char>::length(str);
+
+		if (len > Length() || len == 0) {
+			return false;
+		}
+
+		const char* cstr = CStr();
+
+		for (size_t i = 0; i < Length(); i++) {
+			if (cstr[i] != str[0]) continue;
+			if (std::is_constant_evaluated()) {
+				bool isEqual = true;
+				for (size_t j = 0; j < len; j++) {
+					if (cstr[i + j] != str[j]) {
+						isEqual = false;
+						break;
+					}
+				}
+				if (isEqual) {
+					return true;
+				}
+			}
+
+			/* The non-constexpr branch does not have test coverage. */
+			else {
+				if ((i + len) > Length()) return false;
+				if (memcmp(&cstr[i], str, len) == 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	constexpr bool Contains(const string& other) {
+		const size_t len = other.Length();
+
+		if (len > Length() || len == 0) {
+			return false;
+		}
+
+		const char* cstr = CStr();
+		const char* otherstr = other.CStr();
+
+		for (size_t i = 0; i < Length(); i++) {
+			if (cstr[i] != otherstr[0]) continue;
+			if (std::is_constant_evaluated()) {
+				bool isEqual = true;
+				for (size_t j = 0; j < len; j++) {
+					if (cstr[i + j] != otherstr[j]) {
+						isEqual = false;
+						break;
+					}
+				}
+				if (isEqual) {
+					return true;
+				}
+			}
+
+			/* The non-constexpr branch does not have test coverage. */
+			else {
+				if ((i + len) > Length()) return false;
+				if (memcmp(&cstr[i], otherstr, len) == 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/* Make substring from startIndex (inclusive) and endIndex (exclusive). */
+	constexpr string Substring(size_t startIndex, size_t endIndex) {
+		if (startIndex > Length() || endIndex > Length() || startIndex > endIndex) return string();
+
+		const size_t len = endIndex - startIndex;
+		const size_t cap = len + 1;
+		const char* startBuffer = &CStr()[startIndex];
+		const char* endBuffer = &CStr()[endIndex];
+
+		string s;
+		s.length = len;
+		if (len > maxSSOLength) {
+			s.SetFlagLong();
+			s.rep.lng.capacity = cap;
+			s.rep.lng.data = new char[cap];
+			std::copy(startBuffer, endBuffer, s.rep.lng.data);
+			s.rep.lng.data[len] = '\0';
+		}
+		else {
+			s.SetFlagSmall();
+			s.rep.sso = SmallString();
+			std::copy(startBuffer, endBuffer, s.rep.sso.chars);
+			s.rep.sso.chars[len] = '\0';
+		}
+		return s;
+	}
 
 	
 };

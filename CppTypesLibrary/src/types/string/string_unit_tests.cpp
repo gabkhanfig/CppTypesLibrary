@@ -6,6 +6,14 @@
 namespace StringUnitTests
 {
 
+#pragma region Class
+
+	static_assert(sizeof(string) == 32, "Size of string is not 32 bytes");
+
+	static_assert(sizeof(string::SmallString) == sizeof(string::LongString), "String representations do not have equal size");
+
+#pragma endregion
+
 #pragma region Default_Constructor
 
 	constexpr bool DefaultConstructIsSmall() {
@@ -611,7 +619,195 @@ namespace StringUnitTests
 		return s2.Length() == 1;
 	}
 	TEST_ASSERT(AssignmentCopyLongToSmallLength(), "Long to small copy assignment string has an invalid length");
-	
+
+#pragma endregion
+
+#pragma region Character_Indexing
+
+	constexpr bool CharAtIndexSmall() {
+		const char* str = "abcdefg";
+		string s = str;
+		for (int i = 0; i < 8; i++) {
+			if (s.At(i) != str[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(CharAtIndexSmall(), "Character indexing in small string is incorrect");
+
+	constexpr bool CharAtIndexLong() {
+		const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
+		string s = alphabet;
+		for (int i = 0; i < 27; i++) {
+			if (s.At(i) != alphabet[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(CharAtIndexLong(), "Character indexing in long string is incorrect");
+
+	constexpr bool CharAtIndexOperatorSmall() {
+		const char* str = "abcdefg";
+		string s = str;
+		for (int i = 0; i < 8; i++) {
+			if (s[i] != str[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(CharAtIndexOperatorSmall(), "Character operator indexing in small string is incorrect");
+
+	constexpr bool CharAtIndexOperatorLong() {
+		const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
+		string s = alphabet;
+		for (int i = 0; i < 27; i++) {
+			if (s[i] != alphabet[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(CharAtIndexOperatorLong(), "Character operator indexing in long string is incorrect");
+
+	constexpr bool CharAtOutOfRangeSmall() {
+		string s = "abcdefg";
+		return s.At(100) == '\0';
+	}
+	TEST_ASSERT(CharAtOutOfRangeSmall(), "Small string out of range indexing does not default to null terminator");
+
+	constexpr bool CharAtOutOfRangeLong() {
+		string s = "abcdefghijklmnopqrstuvwxyz";
+		return s.At(100) == '\0';
+	}
+	TEST_ASSERT(CharAtOutOfRangeLong(), "Long string out of range indexing does not default to null terminator");
+
+#pragma endregion
+
+#pragma region Contains
+
+	constexpr bool ContainsCharSmall() {
+		char a = 'a';
+		string s = "it's a string";
+		return s.Contains(a);
+	}
+	TEST_ASSERT(ContainsCharSmall(), "Small string does not contains char");
+
+	constexpr bool ContainsCharLong() {
+		char z = 'z';
+		string s = "abcdefghijklmnopqrstuvwxyz";
+		return s.Contains(z);
+	}
+	TEST_ASSERT(ContainsCharLong(), "Long string does not contain char");
+
+	constexpr bool ContainsConstCharSmall() {
+		const char* teststr = "ring";
+		string s = "it's a string";
+		return s.Contains(teststr);
+	}
+	TEST_ASSERT(ContainsConstCharSmall(), "Small string does not contain const char*");
+
+	constexpr bool ContainsConstCharLong() {
+		const char* teststr = "than the ";
+		string s = "this is an example of a string that's longer than the small string capacity";
+		return s.Contains(teststr);
+	}
+	TEST_ASSERT(ContainsConstCharLong(), "Long string does not contain const char*");
+
+	constexpr bool ContainsSubstringSmall() {
+		string teststr = "ring";
+		string s = "it's a string";
+		return s.Contains(teststr);
+	}
+	TEST_ASSERT(ContainsSubstringSmall(), "Small string does not contain sub-string");
+
+	constexpr bool ContainsSubstringLong() {
+		string teststr = "than the ";
+		string s = "this is an example of a string that's longer than the small string capacity";
+		return s.Contains(teststr);
+	}
+	TEST_ASSERT(ContainsSubstringLong(), "Long string does not contain sub-string");
+
+#pragma endregion
+
+#pragma region Substring
+
+	constexpr bool SubstringSmallToSmallIsSmall() {
+		string s = "hello world!";
+		string sub = s.Substring(6, 11);
+		return !sub.IsLong();
+	}
+	TEST_ASSERT(SubstringSmallToSmallIsSmall(), "Small to small substring is not small");
+
+	constexpr bool SubstringSmallToSmallChars() {
+		string s = "hello world!";
+		string sub = s.Substring(6, 11);
+
+		const char* substrmatch = "world";
+		const char* subcstr = sub.CStr();
+		for (int i = 0; i < 6; i++) {
+			if (subcstr[i] != substrmatch[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(SubstringSmallToSmallChars(), "Small to small substring has incorrect characters");
+
+	constexpr bool SubstringSmallToSmallLength() {
+		string s = "hello world!";
+		string sub = s.Substring(6, 11);
+		return sub.Length() == 5;
+	}
+	TEST_ASSERT(SubstringSmallToSmallLength(), "Small to small substring is the wrong length");
+
+	constexpr bool SubstringLongToLongIsLong() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(10, 97);
+		return sub.IsLong();
+	}
+	TEST_ASSERT(SubstringLongToLongIsLong(), "Long to long substring is not small");
+
+	constexpr bool SubstringLongToLongChars() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(10, 97);
+
+		const char* substrmatch = "super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		const char* subcstr = sub.CStr();
+		for (int i = 0; i < 88; i++) {
+			if (subcstr[i] != substrmatch[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(SubstringLongToLongChars(), "Long to long substring has incorrect characters");
+
+	constexpr bool SubstringLongToLongLength() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(10, 97);
+		return sub.Length() == 87;
+	}
+	TEST_ASSERT(SubstringLongToLongLength(), "Long to long substring is the wrong length");
+
+	constexpr bool SubstringLongToSmallIsSmall() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(33, 44);
+		return !sub.IsLong();
+	}
+	TEST_ASSERT(SubstringLongToSmallIsSmall(), "Long to small substring is not small");
+
+	constexpr bool SubstringLongToSmallChars() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(33, 44);
+
+		const char* substrmatch = "extremely l";
+		const char* subcstr = sub.CStr();
+		for (int i = 0; i < 12; i++) {
+			if (subcstr[i] != substrmatch[i]) return false;
+		}
+		return true;
+	}
+	TEST_ASSERT(SubstringLongToSmallChars(), "Long to small substring has incorrect characters");
+
+	constexpr bool SubstringLongToSmallLength() {
+		string s = "this is a super duper absolutely extremely long string it's gigantic and takes up a lot of memory";
+		string sub = s.Substring(33, 44);
+		return sub.Length() == 11;
+	}
+	TEST_ASSERT(SubstringLongToSmallLength(), "Long to small substring is the wrong length");
+
+
 #pragma endregion
 
 }
