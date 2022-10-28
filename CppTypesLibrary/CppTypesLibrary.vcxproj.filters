@@ -24,12 +24,21 @@
     <ClCompile Include="src\types\string\string_unit_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\types\array\dynamic_array.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\types\array\dynamic_array_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\types\string\string.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\testframework\unit_test_compile_time.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types\array\dynamic_array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

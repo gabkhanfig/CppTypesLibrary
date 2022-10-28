@@ -82,6 +82,27 @@ namespace StringUnitTests
 	}
 	TEST_ASSERT(ConstCharConstructLongLength(), "Long const char* constructed string has an invalid length");
 
+	constexpr bool ConstCharConstructNullptrIsSmall() {
+		const char* str = nullptr;
+		string s = str;
+		return !s.IsLong();
+	}
+	TEST_ASSERT(ConstCharConstructNullptrIsSmall(), "Edge-case const char* nullptr constructed string is not sso enabled");
+
+	constexpr bool ConstCharConstructNullptrNullTerminator() {
+		const char* str = nullptr;
+		string s = str;
+		return s.CStr()[0] == '\0';
+	}
+	TEST_ASSERT(ConstCharConstructNullptrNullTerminator(), "Edge-case const char* nullptr constructed string is not null terminated");
+
+	constexpr bool ConstCharConstructNullptrLength() {
+		const char* str = nullptr;
+		string s = str;
+		return s.Length() == 0;
+	}
+	TEST_ASSERT(ConstCharConstructNullptrLength(), "Edge-case const char* nullptr constructed string has an invalid length");
+
 #pragma endregion
 
 #pragma region Move_Constructor
@@ -329,6 +350,48 @@ namespace StringUnitTests
 		return s.Length() == 1;
 	}
 	TEST_ASSERT(AssignmentConstCharLongToSmallLength(), "Long to small assignment string has an invalid length");
+
+	constexpr bool AssignmentConstCharSmallToNullptrIsSmall() {
+		string s = "a";
+		s = nullptr; 
+		return !s.IsLong();
+	}
+	TEST_ASSERT(AssignmentConstCharSmallToNullptrIsSmall(), "Edge-case const char* nullptr small assignment string is not sso enabled");
+
+	constexpr bool AssignmentConstCharLongToNullptrIsSmall() {
+		string s = "abcdefghijklmnopqrstuvwxyz";
+		s = nullptr;
+		return !s.IsLong();
+	}
+	TEST_ASSERT(AssignmentConstCharLongToNullptrIsSmall(), "Edge-case const char* nullptr long assignment string is not sso enabled");
+
+	constexpr bool AssignmentConstCharSmallToNullptrNullTerminator() {
+		string s = "a";
+		s = nullptr;
+		return s.CStr()[0] == '\0';
+	}
+	TEST_ASSERT(AssignmentConstCharSmallToNullptrNullTerminator(), "Edge-case const char* nullptr small assignment string is not null terminated");
+
+	constexpr bool AssignmentConstCharLongToNullptrNullTerminator() {
+		string s = "abcdefghijklmnopqrstuvwxyz";
+		s = nullptr;
+		return s.CStr()[0] == '\0';
+	}
+	TEST_ASSERT(AssignmentConstCharLongToNullptrNullTerminator(), "Edge-case const char* nullptr long assignment string is not null terminated");
+
+	constexpr bool AssignmentConstCharSmallToNullptrLength() {
+		string s = "a";
+		s = nullptr;
+		return s.Length() == 0;
+	}
+	TEST_ASSERT(AssignmentConstCharSmallToNullptrLength(), "Edge-case const char* nullptr small assignment string has an invalid length");
+
+	constexpr bool AssignmentConstCharLongToNullptrLength() {
+		string s = "abcdefghijklmnopqrstuvwxyz";
+		s = nullptr;
+		return s.Length() == 0;
+	}
+	TEST_ASSERT(AssignmentConstCharLongToNullptrLength(), "Edge-case const char* nullptr long assignment string has an invalid length");
 
 #pragma endregion
 

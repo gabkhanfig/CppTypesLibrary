@@ -44,18 +44,26 @@ public:
 
 private:
 
+	/* Flag bit representing whether the string is in the long string representation or not. */
 	size_t flag : 1;
+
+	/* Length of contained string, sso or not. */
 	size_t length : 63;
+
+	/**/
 	StringRep rep;
 
+	/**/
 	constexpr void SetFlagSmall() {
 		flag = false;
 	}
 
+	/**/
 	constexpr void SetFlagLong() {
 		flag = true;
 	}
 
+	/**/
 	constexpr void SetLength(size_t newLength) {
 		length = newLength;
 	}
@@ -69,28 +77,39 @@ private:
 		}
 	}
 
-
 public:
 
+	/**/
 	constexpr bool IsLong() const {
 		return flag;
 	}
 
+	/**/
 	constexpr size_t Length() const {
 		return length;
 	}
 
+	/**/
 	constexpr size_t Capacity() const {
 		return rep.lng.capacity;
 	}
 
+	/**/
 	constexpr string() {
 		rep.sso.chars[0] = '\0';
 		SetLength(0);
 		SetFlagSmall();
 	}
 
+	/**/
 	constexpr string(const char* str) {
+		if (str == nullptr) {
+			rep.sso.chars[0] = '\0';
+			SetLength(0);
+			SetFlagSmall();
+			return;
+		}
+
 		const size_t len = std::char_traits<char>::length(str);
 		const size_t cap = len + 1;
 		const bool isLongStr = len > maxSSOLength;
@@ -108,6 +127,7 @@ public:
 		}
 	}
 
+	/**/
 	constexpr string(string&& other) noexcept {
 		SetLength(other.Length());
 		if (other.IsLong()) {
@@ -123,6 +143,7 @@ public:
 		}
 	}
 
+	/**/
 	constexpr string(const string& other) {
 		const char* str = other.CStr();
 		SetLength(other.Length());
@@ -138,11 +159,13 @@ public:
 			std::copy(other.rep.sso.chars, &other.rep.sso.chars[maxSSOLength + 1], rep.sso.chars);
 		}
 	}
-
+	
+	/**/
 	constexpr ~string() {
 		DeleteDataBuffer();
 	}
 
+	/**/
 	constexpr const char* CStr() const {
 		if (IsLong()) {
 			return rep.lng.data;
@@ -152,8 +175,17 @@ public:
 		}
 	}
 
+	/**/
 	constexpr void operator = (const char* str) {
 		DeleteDataBuffer();
+
+		if (str == nullptr) {
+			rep.sso.chars[0] = '\0';
+			SetLength(0);
+			SetFlagSmall();
+			return;
+		}
+
 		const size_t len = std::char_traits<char>::length(str);
 		const size_t cap = len + 1;
 		const bool isLongStr = len > maxSSOLength;
@@ -171,6 +203,7 @@ public:
 		}
 	}
 
+	/**/
 	constexpr void operator = (string&& other) noexcept {
 		DeleteDataBuffer();
 		SetLength(other.Length());
@@ -187,6 +220,7 @@ public:
 		}
 	}
 
+	/**/
 	constexpr void operator = (const string& other) {
 		DeleteDataBuffer();
 		const char* str = other.CStr();
@@ -204,6 +238,7 @@ public:
 		}
 	}
 
+	/**/
 	constexpr char At(size_t index) {
 		if (index > length + 1) {
 			return '\0';
@@ -211,10 +246,12 @@ public:
 		return CStr()[index];
 	}
 
+	/**/
 	constexpr char operator[] (size_t index) {
 		return At(index);
 	}
 
+	/**/
 	constexpr bool Contains(char character) {
 		const char* cstr = CStr();
 		for (size_t i = 0; i < Length(); i++) {
@@ -223,6 +260,7 @@ public:
 		return false;
 	}
 
+	/**/
 	constexpr bool Contains(const char* str) {
 		const size_t len = std::char_traits<char>::length(str);
 
@@ -258,6 +296,7 @@ public:
 		return false;
 	}
 
+	/**/
 	constexpr bool Contains(const string& other) {
 		const size_t len = other.Length();
 
@@ -320,6 +359,35 @@ public:
 		}
 		return s;
 	}
+
+	constexpr bool operator == (const char* str) {
+		if (str == nullptr) return false;
+		const size_t len = std::char_traits<char>::length(str);
+		if (len != Length()) return false;
+
+		const char* cstr = CStr();
+
+		// Assume both are null terminated.
+		for (size_t i = 0; i < Length(); i++) {
+			if (cstr[i] != str[i]) return false;
+		}
+		return true;
+	}
+
+	constexpr bool operator == (const string& other) {
+		if (other.Length() != Length()) return false;
+
+		const char* str = other.CStr();
+		const char* cstr = CStr();
+
+		// Assume both are null terminated.
+		for (size_t i = 0; i < Length(); i++) {
+			if (cstr[i] != str[i]) return false;
+		}
+		return true;
+	}
+
+
 
 	
 };
