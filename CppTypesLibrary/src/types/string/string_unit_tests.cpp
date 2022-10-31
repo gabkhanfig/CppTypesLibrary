@@ -727,18 +727,6 @@ namespace StringUnitTests
 	}
 	TEST_ASSERT(CharAtIndexOperatorLong(), "Character operator indexing in long string is incorrect");
 
-	constexpr bool CharAtOutOfRangeSmall() {
-		string s = "abcdefg";
-		return s.At(100) == '\0';
-	}
-	TEST_ASSERT(CharAtOutOfRangeSmall(), "Small string out of range indexing does not default to null terminator");
-
-	constexpr bool CharAtOutOfRangeLong() {
-		string s = "abcdefghijklmnopqrstuvwxyz";
-		return s.At(100) == '\0';
-	}
-	TEST_ASSERT(CharAtOutOfRangeLong(), "Long string out of range indexing does not default to null terminator");
-
 #pragma endregion
 
 #pragma region Contains

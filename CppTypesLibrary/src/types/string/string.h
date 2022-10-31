@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iomanip>
+#include <stdexcept>
 
 /* Constexpr and SSO enabled string. Can store strings of length 23 within sso buffer (excluding null terminator). */
 struct string
@@ -241,7 +242,9 @@ public:
 	/**/
 	constexpr char At(size_t index) {
 		if (index > length + 1) {
-			return '\0';
+			//if (std::is_constant_evaluated()) {
+			//}
+			throw std::out_of_range("String char At() index is out of bounds!");
 		}
 		return CStr()[index];
 	}
