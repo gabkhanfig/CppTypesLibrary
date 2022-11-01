@@ -60,4 +60,87 @@ struct bitset
 	constexpr bool operator == (Bittype other) {
 		return bits == other;
 	}
+
+	template<size_t N>
+	constexpr Bittype operator & (const bitset<N> other) {
+		return bits & other.bits;
+	}
+
+	constexpr Bittype operator & (Bittype other) {
+		return bits & other;
+	}
+
+	template<size_t N>
+	constexpr Bittype operator &= (const bitset<N> other) {
+		bits &= other.bits;
+		return bits;
+	}
+
+	constexpr Bittype operator &= (Bittype other) {
+		bits &= other;
+		return bits;
+	}
+
+	template<size_t N>
+	constexpr Bittype operator | (const bitset<N> other) {
+		return bits | other.bits;
+	}
+
+	constexpr Bittype operator | (Bittype other) {
+		return bits | other;
+	}
+
+	template<size_t N>
+	constexpr Bittype operator |= (const bitset<N> other) {
+		bits |= other.bits;
+		return bits;
+	}
+
+	constexpr Bittype operator |= (Bittype other) {
+		bits |= other;
+		return bits;
+	}
+
+	template<size_t N>
+	constexpr Bittype operator ^ (const bitset<N> other) {
+		return bits ^ other.bits;
+	}
+
+	constexpr Bittype operator ^ (Bittype other) {
+		return bits ^ other;
+	}
+
+	template<size_t N>
+	constexpr Bittype operator ^= (const bitset<N> other) {
+		bits ^= other.bits;
+		return bits;
+	}
+
+	constexpr Bittype operator ^= (Bittype other) {
+		bits ^= other;
+		return bits;
+	}
+
+	constexpr Bittype operator << (const size_t shift) {
+		return bits << shift;
+	}
+
+	constexpr Bittype operator <<= (const size_t shift) {
+		bits <<= shift;
+		return bits;
+	}
+
+	constexpr Bittype operator >> (const size_t shift) {
+		return bits >> shift;
+	}
+
+	constexpr Bittype operator >>= (const size_t shift) {
+		bits >>= shift;
+		return bits;
+	}
+
+	constexpr Bittype operator ~ () {
+		return ~bits;
+	}
+
 };
