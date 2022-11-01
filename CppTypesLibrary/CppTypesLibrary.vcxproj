@@ -138,12 +138,15 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\types\array\dynamic_array.cpp" />
     <ClCompile Include="src\types\array\dynamic_array_tests.cpp" />
+    <ClCompile Include="src\types\bitset\bitset.cpp" />
+    <ClCompile Include="src\types\bitset\bitset_tests.cpp" />
     <ClCompile Include="src\types\string\string.cpp" />
     <ClCompile Include="src\types\string\string_unit_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\testframework\unit_test_compile_time.h" />
     <ClInclude Include="src\types\array\dynamic_array.h" />
+    <ClInclude Include="src\types\bitset\bitset.h" />
     <ClInclude Include="src\types\string\string.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
