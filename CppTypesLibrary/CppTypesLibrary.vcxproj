@@ -136,11 +136,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\types\array\dynamic_array.cpp" />
     <ClCompile Include="src\types\array\dynamic_array_tests.cpp" />
-    <ClCompile Include="src\types\bitset\bitset.cpp" />
     <ClCompile Include="src\types\bitset\bitset_tests.cpp" />
-    <ClCompile Include="src\types\string\string.cpp" />
     <ClCompile Include="src\types\string\string_unit_tests.cpp" />
   </ItemGroup>
   <ItemGroup>

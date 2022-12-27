@@ -1,396 +1,333 @@
 #pragma once
 
-#include <iomanip>
-#include <stdexcept>
+#include <Windows.h>
+#include <psapi.h>
+#include <libloaderapi.h>
+#include <iostream>
 
-/* Constexpr and SSO enabled string. Can store strings of length 23 within sso buffer (excluding null terminator). */
-struct string
+#define _STRING_SSO_ALIGNMENT 32
+
+constexpr const char* _emptyString = "";
+
+/* A constexpr, sso, and const segment enabled string class. Can check if const char*'s passed in exist within the application const data segment,
+and avoid doing unnecessary copying with this.
+@param BUFFER_SIZE: Size of the sso character buffer. Must be a multiple of 32. */
+template<size_t BUFFER_SIZE = 32>
+struct
+#ifdef _MSC_VER
+	__declspec(align(_STRING_SSO_ALIGNMENT))
+#else
+	alignas(_STRING_SSO_ALIGNMENT)
+#endif
+	buffer_string
 {
-public:
-
-	static constexpr size_t maxSSOLength = 23;
-
-	struct LongString {
-		char* data;
-		size_t capacity;
-		size_t padding;
-
-		constexpr LongString()
-			: data(nullptr), capacity(0), padding(0)
-		{}
-	};
-
-	struct SmallString {
-		char chars[maxSSOLength + 1];
-
-		constexpr SmallString()
-			: chars{ '\0' }
-		{}
-
-		constexpr void operator = (const LongString& other) {
-			chars[0] = '\0';
-		}
-	};
-
-	union StringRep {
-		SmallString sso;
-		LongString lng;
-
-		constexpr StringRep() {
-			lng = LongString();
-		}
-	};
-
-	
+	static_assert(BUFFER_SIZE % _SSO_ALIGNMENT == 0, "The size of the buffer characters must be a multiple of _STRING_SSO_ALIGNMENT (32)");
 
 private:
 
-	/* Flag bit representing whether the string is in the long string representation or not. */
-	size_t flag : 1;
+	/* Small String Optimization buffer. */
+	char sso[BUFFER_SIZE];
 
-	/* Length of contained string, sso or not. */
-	size_t length : 63;
+	/* Length of the string, whether in the buffer or the heap data. */
+	size_t length;
 
-	/**/
-	StringRep rep;
+	/* Heap data or constexpr string. */
+	char* data;
 
-	/**/
-	constexpr void SetFlagSmall() {
-		flag = false;
+	/* Capacity of the heap data string. */
+	size_t capacity;
+
+	/* Is this string currently using the sso buffer? */
+	unsigned char flagSSOBuffer : 1;
+
+	/* Is this string's data pointer held within the const segment? */
+	unsigned char flagConstSegment : 1;
+
+private:
+
+	constexpr static size_t GetMaxSSOLength() {
+		return BUFFER_SIZE - 1;
 	}
 
-	/**/
-	constexpr void SetFlagLong() {
-		flag = true;
+	/* Sets the data pointer to a const segment. Assumes the pointer passed in is within the const segment. */
+	constexpr void SetStringToConstSegment(const char* segment) {
+		data = (char*)segment;
+		flagSSOBuffer = false;
+		flagConstSegment = true;
 	}
 
-	/**/
+	/* Yeah :) */
 	constexpr void SetLength(size_t newLength) {
 		length = newLength;
 	}
 
-	/* Deletes the long string representation data buffer if the string is a long string, and the data buffer is non-null. */
-	constexpr void DeleteDataBuffer() {
-		if (IsLong()) {
-			if (rep.lng.data) {
-				delete[] rep.lng.data;
+	/* Sets the sso buffer to a copy of whatever the characters in chars are.
+	Uses len + 1 to include null terminator. Sets the relevant flags. */
+	constexpr void SetSSOBufferChars(const char* chars, size_t len) {
+		flagSSOBuffer = true;
+		flagConstSegment = false;
+		CopyCharsIntoBuffer(chars, len);
+		sso[BUFFER_SIZE - 1] = '\0';
+	}
+
+	/* Sets the data pointer to new chars by copying them. Assumes passed in chars is not within the const segment.
+	Uses len + 1 to include null terminator. Sets the relevant flags.*/
+	constexpr void SetDataChars(const char* chars, size_t len) {
+		flagSSOBuffer = false;
+		flagConstSegment = false;
+		CopyCharsIntoData(chars, len);
+	}
+
+	/* Copies numToCopy + 1, primarily being the null terminator. */
+	constexpr void CopyCharsIntoBuffer(const char* chars, size_t numToCopy) {
+		std::copy(chars, &chars[numToCopy + 1], sso);
+	}
+
+	/* Copies numToCopy + 1, primarily being the null terminator. */
+	constexpr void CopyCharsIntoData(const char* chars, size_t numToCopy) {
+		std::copy(chars, &chars[numToCopy + 1], data);
+	}
+
+	/* Attempts to delete the data string. Will not delete under the following conditions.
+	1. The string is using the SSO buffer.
+	2. The data pointer is nullptr.
+	3. If the data pointer is in the const segment and not constexpr. */
+	constexpr void TryDeleteDataString() {
+		if (!flagSSOBuffer && data != nullptr && data != _emptyString) {
+			if (!std::is_constant_evaluated() && flagConstSegment) {
+				delete[] data;
+				return;
 			}
+			delete[] data;
+		}
+	}
+
+	/* Performs necessary construction for this string's values from a const char*. */
+	inline constexpr void ConstructConstChar(const char* str)
+	{
+		const size_t len = StrLen(str);
+		SetLength(len);
+		if (!std::is_constant_evaluated() && buffer_string::IsConstCharInConstSegment(str)) {
+			SetStringToConstSegment(str);
+			return;
+		}
+
+		if (len > GetMaxSSOLength()) {
+			capacity = len + 1;
+			data = new char[capacity];
+			SetDataChars(str, len);
+		}
+		else {
+			SetSSOBufferChars(str, len);
+		}
+	}
+
+	/* Performs necessary construction for this string's values from another string through copying. */
+	inline constexpr void ConstructCopy(const buffer_string<BUFFER_SIZE>& other)
+	{
+		const size_t len = other.Len();
+		const char* str = other.CStr();
+		SetLength(len);
+		if (!std::is_constant_evaluated() && buffer_string::IsConstCharInConstSegment(str)) {
+			SetStringToConstSegment(str);
+			return;
+		}
+
+		if (len > GetMaxSSOLength()) {
+			capacity = len + 1;
+			data = new char[capacity];
+			SetDataChars(str, len);
+		}
+		else {
+			SetSSOBufferChars(str, len);
+		}
+	}
+
+	/* Performs necessary construction for this string's values from moving another string. Sets the other string data to by nullptr if it's using it. */
+	inline constexpr void ConstructMove(buffer_string<BUFFER_SIZE>&& other) noexcept
+	{
+		const size_t len = other.Len();
+		const char* str = other.CStr();
+		SetLength(len);
+
+		if (!std::is_constant_evaluated() && buffer_string::IsConstCharInConstSegment(str)) {
+			data = (char*)str;
+			flagSSOBuffer = false;
+			capacity = 0;
+			flagConstSegment = true;
+			return;
+		}
+
+		if (len > GetMaxSSOLength()) {
+			capacity = len + 1;
+			data = (char*)str;
+			other.data = nullptr;
+			flagSSOBuffer = false;
+
+		}
+		else {
+			SetSSOBufferChars(str, len);
 		}
 	}
 
 public:
 
-	/**/
-	constexpr bool IsLong() const {
-		return flag;
+	/* Get if a const char* is within the runtime const segment of the running application. Not constexpr valid. Currently only works on windows. */
+	[[nodiscard]] static bool IsConstCharInConstSegment(const char* str)
+	{
+#ifdef _MSC_VER
+		static MODULEINFO moduleInfo;
+		static const bool b = GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &moduleInfo, sizeof(MODULEINFO));
+		static const uintptr_t entryPoint = uintptr_t(moduleInfo.EntryPoint);
+		static const uintptr_t endPoint = uintptr_t(moduleInfo.EntryPoint) + uintptr_t(moduleInfo.SizeOfImage);
+		return uintptr_t(str) > entryPoint && uintptr_t(str) < endPoint;
+#else
+		return false;
+#endif
+	}
+
+	/* Check the length of a const char*
+	TODO SIMD / SSE / AVX optimizations. */
+	[[nodiscard]] constexpr static size_t StrLen(const char* str) {
+		return std::char_traits<char>::length(str);
+	}
+
+	/* Check if two character arrays are equal.
+	TODO SIMD / SSE / AVX optimizations. */
+	[[nodiscard]] constexpr static bool StrEqual(const char* str1, const char* str2, size_t num) {
+		for (int i = 0; i < num; i++) {
+			if (str1[i] != str2[i]) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**/
-	constexpr size_t Length() const {
-		return length;
+	constexpr buffer_string()
+		: sso{ '\0' }, length{ 0 }, capacity{ 0 }
+	{
+		SetStringToConstSegment(_emptyString);
 	}
 
 	/**/
-	constexpr size_t Capacity() const {
-		return rep.lng.capacity;
+	constexpr buffer_string(const char* str)
+		: sso{ '\0' }, data{ nullptr }, length{ 0 }, capacity{ 0 }
+	{
+		ConstructConstChar(str);
 	}
 
 	/**/
-	constexpr string() {
-		rep.sso.chars[0] = '\0';
-		SetLength(0);
-		SetFlagSmall();
+	constexpr buffer_string(const buffer_string<BUFFER_SIZE>& other)
+		: sso{ '\0' }, data{ nullptr }, length{ 0 }, capacity{ 0 }
+	{
+		ConstructCopy(other);
 	}
 
 	/**/
-	constexpr string(const char* str) {
-		if (str == nullptr) {
-			rep.sso.chars[0] = '\0';
-			SetLength(0);
-			SetFlagSmall();
-			return;
-		}
-
-		const size_t len = std::char_traits<char>::length(str);
-		const size_t cap = len + 1;
-		const bool isLongStr = len > maxSSOLength;
-		SetLength(len);
-		if (isLongStr) {
-			SetFlagLong();
-			rep.lng.capacity = cap;
-			rep.lng.data = new char[cap];
-			std::copy(str, &str[cap], rep.lng.data);
-		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(str, &str[cap], rep.sso.chars);
-		}
+	constexpr buffer_string(buffer_string<BUFFER_SIZE>&& other) noexcept
+		: sso{ '\0' }, data{ nullptr }, length{ 0 }, capacity{ 0 }
+	{
+		ConstructMove(std::move(other));
 	}
 
 	/**/
-	constexpr string(string&& other) noexcept {
-		SetLength(other.Length());
-		if (other.IsLong()) {
-			SetFlagLong();
-			rep.lng.data = other.rep.lng.data;
-			other.rep.lng.data = nullptr;
-			rep.lng.capacity = other.rep.lng.capacity;
-		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(other.rep.sso.chars, &other.rep.sso.chars[maxSSOLength + 1], rep.sso.chars);
-		}
+	constexpr ~buffer_string()
+	{
+		TryDeleteDataString();
 	}
 
 	/**/
-	constexpr string(const string& other) {
-		const char* str = other.CStr();
-		SetLength(other.Length());
-		if (other.IsLong()) {
-			SetFlagLong();
-			rep.lng.capacity = other.rep.lng.capacity;
-			rep.lng.data = new char[Length() + 1];
-			std::copy(str, &str[Length() + 1], rep.lng.data);
-		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(other.rep.sso.chars, &other.rep.sso.chars[maxSSOLength + 1], rep.sso.chars);
-		}
-	}
-	
-	/**/
-	constexpr ~string() {
-		DeleteDataBuffer();
+	constexpr buffer_string<BUFFER_SIZE>& operator = (const char* str)
+	{
+		TryDeleteDataString();
+		ConstructConstChar(str);
+		return *this;
 	}
 
 	/**/
-	constexpr const char* CStr() const {
-		if (IsLong()) {
-			return rep.lng.data;
-		}
-		else {
-			return rep.sso.chars;
-		}
+	constexpr buffer_string<BUFFER_SIZE>& operator = (const buffer_string<BUFFER_SIZE>& other)
+	{
+		TryDeleteDataString();
+		ConstructCopy(other);
+		return *this;
 	}
 
 	/**/
-	constexpr void operator = (const char* str) {
-		DeleteDataBuffer();
+	constexpr buffer_string<BUFFER_SIZE>& operator = (buffer_string<BUFFER_SIZE>&& other) noexcept
+	{
+		TryDeleteDataString();
+		ConstructMove(std::move(other));
+		return *this;
+	}
 
-		if (str == nullptr) {
-			rep.sso.chars[0] = '\0';
-			SetLength(0);
-			SetFlagSmall();
-			return;
-		}
+	/* Whether this string is currently using the sso buffer. */
+	[[nodiscard]] constexpr bool IsSSO() const { return flagSSOBuffer; }
 
-		const size_t len = std::char_traits<char>::length(str);
-		const size_t cap = len + 1;
-		const bool isLongStr = len > maxSSOLength;
-		SetLength(len);
-		if (isLongStr) {
-			SetFlagLong();
-			rep.lng.capacity = cap;
-			rep.lng.data = new char[cap];
-			std::copy(str, &str[cap], rep.lng.data);
+	/* Whether this string is currently pointing to data in the const data segment. */
+	[[nodiscard]] constexpr bool IsConstSegment() const { return flagConstSegment; }
+
+	/* Get the length of this string. */
+	[[nodiscard]] constexpr size_t Len() const { return length; }
+
+	/* Get the const char* string version of this string. Pulls either the sso buffer or the data pointer. */
+	[[nodiscard]] constexpr const char* CStr() const {
+		if (!flagSSOBuffer) {
+			return data;
 		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(str, &str[cap], rep.sso.chars);
-		}
+		return sso;
 	}
 
 	/**/
-	constexpr void operator = (string&& other) noexcept {
-		DeleteDataBuffer();
-		SetLength(other.Length());
-		if (other.IsLong()) {
-			SetFlagLong();
-			rep.lng.data = other.rep.lng.data;
-			other.rep.lng.data = nullptr;
-			rep.lng.capacity = other.rep.lng.capacity;
-		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(other.rep.sso.chars, &other.rep.sso.chars[maxSSOLength + 1], rep.sso.chars);
-		}
-	}
+	[[nodiscard]] constexpr bool IsEmpty() const { Len() == 0; }
 
-	/**/
-	constexpr void operator = (const string& other) {
-		DeleteDataBuffer();
-		const char* str = other.CStr();
-		SetLength(other.Length());
-		if (other.IsLong()) {
-			SetFlagLong();
-			rep.lng.capacity = other.rep.lng.capacity;
-			rep.lng.data = new char[Length() + 1];
-			std::copy(str, &str[Length() + 1], rep.lng.data);
-		}
-		else {
-			SetFlagSmall();
-			rep.sso = SmallString();
-			std::copy(other.rep.sso.chars, &other.rep.sso.chars[maxSSOLength + 1], rep.sso.chars);
-		}
-	}
-
-	/**/
-	constexpr char At(size_t index) {
-		if (index > length + 1) {
-			//if (std::is_constant_evaluated()) {
-			//}
-			throw std::out_of_range("String char At() index is out of bounds!");
-		}
+	/* Get a character at a specified index. Not a reference to the character though. */
+	[[nodiscard]] constexpr char At(size_t index) {
 		return CStr()[index];
 	}
 
-	/**/
-	constexpr char operator[] (size_t index) {
+	/* Get a character at a specified index. Not a reference to the character though. */
+	[[nodiscard]] constexpr char operator[](size_t index) {
 		return At(index);
 	}
 
-	/**/
-	constexpr bool Contains(char character) {
-		const char* cstr = CStr();
-		for (size_t i = 0; i < Length(); i++) {
-			if (cstr[i] == character) return true;
+	/* Check if this string is equal to a const char*. Can check if they are within the const data segment and bypass most string checks. */
+	[[nodiscard]] constexpr bool operator == (const char* str) const
+	{
+		if (!std::is_constant_evaluated() && buffer_string::IsConstCharInConstSegment(str) && flagConstSegment) {
+			if (data == str) {
+				return true;
+			}
 		}
-		return false;
-	}
-
-	/**/
-	constexpr bool Contains(const char* str) {
-		const size_t len = std::char_traits<char>::length(str);
-
-		if (len > Length() || len == 0) {
+		const size_t len = StrLen(str);
+		if (Len() != len) {
 			return false;
 		}
-
-		const char* cstr = CStr();
-
-		for (size_t i = 0; i < Length(); i++) {
-			if (cstr[i] != str[0]) continue;
-			if (std::is_constant_evaluated()) {
-				bool isEqual = true;
-				for (size_t j = 0; j < len; j++) {
-					if (cstr[i + j] != str[j]) {
-						isEqual = false;
-						break;
-					}
-				}
-				if (isEqual) {
-					return true;
-				}
-			}
-
-			/* The non-constexpr branch does not have test coverage. */
-			else {
-				if ((i + len) > Length()) return false;
-				if (memcmp(&cstr[i], str, len) == 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return StrEqual(CStr(), str, len);
 	}
 
-	/**/
-	constexpr bool Contains(const string& other) {
-		const size_t len = other.Length();
-
-		if (len > Length() || len == 0) {
+	/* Check if this string is equal to another string. Can check if they both use the same const data segment pointer and bypass most string checks. */
+	[[nodiscard]] constexpr bool operator == (const buffer_string<BUFFER_SIZE>& other) const
+	{
+		if (!std::is_constant_evaluated() && flagConstSegment && other.flagConstSegment) {
+			if (data == other.data) {
+				return true;
+			}
+		}
+		const size_t len = other.Len();
+		if (Len() != len) {
 			return false;
 		}
-
-		const char* cstr = CStr();
-		const char* otherstr = other.CStr();
-
-		for (size_t i = 0; i < Length(); i++) {
-			if (cstr[i] != otherstr[0]) continue;
-			if (std::is_constant_evaluated()) {
-				bool isEqual = true;
-				for (size_t j = 0; j < len; j++) {
-					if (cstr[i + j] != otherstr[j]) {
-						isEqual = false;
-						break;
-					}
-				}
-				if (isEqual) {
-					return true;
-				}
-			}
-
-			/* The non-constexpr branch does not have test coverage. */
-			else {
-				if ((i + len) > Length()) return false;
-				if (memcmp(&cstr[i], otherstr, len) == 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return StrEqual(CStr(), other.CStr(), len);
 	}
 
-	/* Make substring from startIndex (inclusive) and endIndex (exclusive). */
-	constexpr string Substring(size_t startIndex, size_t endIndex) {
-		if (startIndex > Length() || endIndex > Length() || startIndex > endIndex) return string();
-
-		const size_t len = endIndex - startIndex;
-		const size_t cap = len + 1;
-		const char* startBuffer = &CStr()[startIndex];
-		const char* endBuffer = &CStr()[endIndex];
-
-		string s;
-		s.length = len;
-		if (len > maxSSOLength) {
-			s.SetFlagLong();
-			s.rep.lng.capacity = cap;
-			s.rep.lng.data = new char[cap];
-			std::copy(startBuffer, endBuffer, s.rep.lng.data);
-			s.rep.lng.data[len] = '\0';
-		}
-		else {
-			s.SetFlagSmall();
-			s.rep.sso = SmallString();
-			std::copy(startBuffer, endBuffer, s.rep.sso.chars);
-			s.rep.sso.chars[len] = '\0';
-		}
-		return s;
+	/* std::cout << string */
+	friend std::ostream& operator << (std::ostream& os, const buffer_string<BUFFER_SIZE>& _string) {
+		return os << _string.CStr();
 	}
 
-	constexpr bool operator == (const char* str) {
-		if (str == nullptr) return false;
-		const size_t len = std::char_traits<char>::length(str);
-		if (len != Length()) return false;
-
-		const char* cstr = CStr();
-
-		// Assume both are null terminated.
-		for (size_t i = 0; i < Length(); i++) {
-			if (cstr[i] != str[i]) return false;
-		}
-		return true;
-	}
-
-	constexpr bool operator == (const string& other) {
-		if (other.Length() != Length()) return false;
-
-		const char* str = other.CStr();
-		const char* cstr = CStr();
-
-		// Assume both are null terminated.
-		for (size_t i = 0; i < Length(); i++) {
-			if (cstr[i] != str[i]) return false;
-		}
-		return true;
-	}
-
-
-
-	
 };
+
+/* A constexpr, sso, and const segment enabled string class. Can check if const char*'s passed in exist within the application const data segment,
+and avoid doing unnecessary copying with this. Has an internal sso buffer size of 32. */
+typedef buffer_string<32> string;
