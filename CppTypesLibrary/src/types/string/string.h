@@ -21,7 +21,7 @@ struct
 #endif
 	buffer_string
 {
-	static_assert(BUFFER_SIZE % _SSO_ALIGNMENT == 0, "The size of the buffer characters must be a multiple of _STRING_SSO_ALIGNMENT (32)");
+	static_assert(BUFFER_SIZE % _STRING_SSO_ALIGNMENT == 0, "The size of the buffer characters must be a multiple of _STRING_SSO_ALIGNMENT (32)");
 
 private:
 
